@@ -1,0 +1,459 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
+local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+local lp = Players.LocalPlayer
+local cam = Workspace.CurrentCamera
+
+local mn = ReplicatedStorage:WaitForChild("McNet")
+local fr = mn:WaitForChild("Networks"):WaitForChild("Fire")
+
+local act = false
+local al = nil
+local ef = nil
+local hb = {}
+local eh = {}
+local lat = 0
+local ac = 0.1
+local ct = nil
+local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+local shootnigger = false
+local vis = false
+local snd = false
+local esp = false
+
+local function cf()
+	if ef then ef:Destroy() end
+	ef = Instance.new("Folder")
+	ef.Name = HttpService:GenerateGUID(false)
+	ef.Parent = Workspace
+end
+
+local function gf()
+	return Workspace:FindFirstChild("NPCs")
+end
+
+local function hr(npc)
+	return npc:FindFirstChild("HumanoidRootPart")
+end
+
+local function dp(pos)
+	local c = lp.Character
+	if not c then return math.huge end
+	local h = c:FindFirstChild("HumanoidRootPart")
+	if not h then return math.huge end
+	return (pos - h.Position).Magnitude
+end
+
+local function ia(npc)
+	if not npc or not npc.Parent then return false end
+	
+	-- Exclude evidence orbs
+	local name = string.lower(npc.Name)
+	if name:find("evidence") or name:find("evidenceorb") or name:find("evidence_orb") then
+		return false
+	end
+	if npc:GetAttribute("IsEvidence") or npc:GetAttribute("IsDrop") or npc:GetAttribute("IsOrb") then
+		return false
+	end
+	
+	local h = npc:GetAttribute("Health")
+	if typeof(h) == "number" and h <= 0 then return false end
+	if npc:GetAttribute("State") == "Dead" then return false end
+	if npc:GetAttribute("Protected") == true then return false end
+	if npc:GetAttribute("Shield") == true then return false end
+	return true
+end
+
+local function gc()
+	local f = gf()
+	if not f then return nil end
+	local cl = nil
+	local md = math.huge
+	for _, n in ipairs(f:GetChildren()) do
+		if not ia(n) then continue end
+		local p = hr(n)
+		if not p then continue end
+		local d = dp(p.Position)
+		if d < md then
+			md = d
+			cl = n
+		end
+	end
+	return cl
+end
+
+local function gw()
+	local c = lp.Character
+	if not c then return nil end
+	local t = c:FindFirstChildOfClass("Tool")
+	if t then return t.Name end
+	return nil
+end
+
+local ln = {
+	"Head",
+	"LeftUpperArm", "LeftLowerArm", "LeftHand",
+	"RightUpperArm", "RightLowerArm", "RightHand",
+	"LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
+	"RightUpperLeg", "RightLowerLeg", "RightFoot",
+	"Torso", "HumanoidRootPart"
+}
+
+local function rl(npc)
+	for _, n in ipairs(ln) do
+		local l = npc:FindFirstChild(n)
+		if l and l:IsA("BasePart") then
+			return l
+		end
+	end
+	return hr(npc)
+end
+
+local function chd(npc)
+	if hb[npc] then return end
+	local p = hr(npc)
+	if not p then return end
+	local b = Instance.new("BillboardGui")
+	b.Name = "H"
+	b.Size = UDim2.new(0, 90, 0, 28)
+	b.StudsOffset = Vector3.new(0, 3.2, 0)
+	b.AlwaysOnTop = true
+	b.MaxDistance = 400
+	b.Parent = ef
+	local f = Instance.new("Frame")
+	f.Size = UDim2.new(1, 0, 1, 0)
+	f.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+	f.BorderSizePixel = 0
+	f.BackgroundTransparency = 0.25
+	f.Parent = b
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, 5)
+	c.Parent = f
+	local bar = Instance.new("Frame")
+	bar.Name = "B"
+	bar.Size = UDim2.new(1, -4, 0, 5)
+	bar.Position = UDim2.new(0, 2, 0, 2)
+	bar.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
+	bar.BorderSizePixel = 0
+	bar.Parent = f
+	local bc = Instance.new("UICorner")
+	bc.CornerRadius = UDim.new(0, 3)
+	bc.Parent = bar
+	local txt = Instance.new("TextLabel")
+	txt.Name = "T"
+	txt.Size = UDim2.new(1, 0, 0, 16)
+	txt.Position = UDim2.new(0, 0, 0, 8)
+	txt.BackgroundTransparency = 1
+	txt.TextColor3 = Color3.fromRGB(255, 255, 255)
+	txt.TextStrokeTransparency = 0.4
+	txt.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+	txt.Font = Enum.Font.GothamBold
+	txt.TextSize = 11
+	txt.Parent = f
+	b.Adornee = p
+	hb[npc] = b
+end
+
+local function uhd(npc)
+	local b = hb[npc]
+	if not b then return end
+	local h = npc:GetAttribute("Health")
+	local mh = npc:GetAttribute("MaxHealth") or 100
+	if typeof(h) ~= "number" then
+		b:Destroy()
+		hb[npc] = nil
+		return
+	end
+	local bar = b.Frame.B
+	local txt = b.Frame.T
+	local r = math.clamp(h / mh, 0, 1)
+	bar.Size = UDim2.new(r, -4, 0, 5)
+	if r > 0.5 then
+		bar.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
+	elseif r > 0.25 then
+		bar.BackgroundColor3 = Color3.fromRGB(255, 200, 0)
+	else
+		bar.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+	end
+	txt.Text = string.format("%.0f / %.0f", h, mh)
+end
+
+local function ce(npc)
+	if eh[npc] then return end
+	local h = Instance.new("Highlight")
+	h.Name = "ESPHighlight"
+	h.FillColor = Color3.fromRGB(255, 0, 0)
+	h.OutlineColor = Color3.fromRGB(255, 100, 100)
+	h.FillTransparency = 0.6
+	h.OutlineTransparency = 0.2
+	h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	h.Parent = ef
+	h.Adornee = npc
+	eh[npc] = h
+	chd(npc)
+end
+
+local function cle()
+	for n, h in pairs(eh) do
+		if h then h:Destroy() end
+	end
+	for n, b in pairs(hb) do
+		if b then b:Destroy() end
+	end
+	eh = {}
+	hb = {}
+end
+
+local function coe()
+	local f = gf()
+	if not f then return end
+	for n, h in pairs(eh) do
+		if not n.Parent or not ia(n) then
+			if h then h:Destroy() end
+			eh[n] = nil
+			if hb[n] then
+				hb[n]:Destroy()
+				hb[n] = nil
+			end
+		end
+	end
+end
+
+local function gmp()
+	local c = lp.Character
+	if not c then return nil end
+	local t = c:FindFirstChildOfClass("Tool")
+	if not t then return nil end
+	local m = t:FindFirstChild("Muzzle") or t:FindFirstChild("Handle") or t:FindFirstChild("Barrel")
+	if m and m:IsA("BasePart") then
+		return m.Position
+	end
+	local h = c:FindFirstChild("HumanoidRootPart")
+	if h then
+		return h.Position + h.CFrame.LookVector * 2
+	end
+	return nil
+end
+
+local function cbe(ep)
+	if not vis then return end
+	local sp = gmp()
+	if not sp then return end
+	local a1 = Instance.new("Attachment")
+	a1.WorldPosition = sp
+	a1.Parent = Workspace.Terrain
+	local a2 = Instance.new("Attachment")
+	a2.WorldPosition = ep
+	a2.Parent = Workspace.Terrain
+	local bm = Instance.new("Beam")
+	bm.Attachment0 = a1
+	bm.Attachment1 = a2
+	bm.Color = ColorSequence.new(Color3.fromRGB(0, 150, 255))
+	bm.LightEmission = 1
+	bm.LightInfluence = 0
+	bm.Width0 = 1.5
+	bm.Width1 = 1.5
+	bm.FaceCamera = true
+	bm.Segments = 10
+	bm.Texture = "rbxassetid://446111271"
+	bm.TextureMode = Enum.TextureMode.Wrap
+	bm.TextureSpeed = 5
+	bm.TextureLength = 1.3
+	bm.Transparency = NumberSequence.new(0.01)
+	bm.Parent = Workspace.Terrain
+	if snd then
+		local s = Instance.new("Sound")
+		s.SoundId = "rbxassetid://17148249625"
+		s.Volume = 1.2
+		s.Parent = Workspace.Terrain
+		s:Play()
+		game:GetService("Debris"):AddItem(s, 3)
+	end
+	task.delay(2, function()
+		local ok, err = pcall(function()
+			local tw = TweenService:Create(bm, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				Transparency = NumberSequence.new(1)
+			})
+			tw:Play()
+			tw.Completed:Wait()
+		end)
+		pcall(function() a1:Destroy() end)
+		pcall(function() a2:Destroy() end)
+		pcall(function() bm:Destroy() end)
+	end)
+end
+
+local function fa(npc, limb)
+	if not npc or not ia(npc) then return end
+	if not limb or not limb:IsA("BasePart") then return end
+	local wn = gw()
+	if not wn then return end
+	local cg = HttpService:GenerateGUID(false)
+	local pos = limb.Position
+	local st = workspace:GetServerTimeNow()
+	local c = lp.Character
+	local h = c and c:FindFirstChild("HumanoidRootPart")
+	if not h then return end
+	local cf = CFrame.new(h.Position, limb.Position)
+	fr:FireServer("Spawn", cf, wn, st, cg)
+	task.spawn(function()
+		RunService.Heartbeat:Wait()
+		local tv = 0.02
+		local args = {
+			"HitRequest",
+			cg,
+			limb,
+			pos,
+			tv,
+			limb.Name
+		}
+		pcall(function()
+			fr:FireServer(unpack(args))
+		end)
+		cbe(pos)
+	end)
+end
+
+local function at()
+	if not shootnigger then return end
+	local now = tick()
+	if now - lat < ac then return end
+	lat = now
+	local t = gc()
+	if not t then
+		ct = nil
+		if esp then cle() end
+		return
+	end
+	if ct ~= t then
+		if esp then cle() end
+		ct = t
+	end
+	if esp then ce(t) end
+	local l = rl(t)
+	if l then
+		fa(t, l)
+	end
+end
+
+Library.ForceCheckbox = false
+Library.ShowToggleFrameInKeybinds = true
+
+local Window = Library:CreateWindow({
+	Title = "mspaint",
+	Footer = "version: example",
+	Icon = 95816097006870,
+	NotifySide = "Right",
+	ShowCustomCursor = true,
+})
+
+-- Manual Right Shift toggle
+local uiVisible = true
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.KeyCode == Enum.KeyCode.RightShift then
+		uiVisible = not uiVisible
+		Library:Toggle(uiVisible)
+	end
+end)
+
+local Tabs = {
+	Main = Window:AddTab("Main", "user"),
+	["UI Settings"] = Window:AddTab("UI Settings", "settings"),
+}
+
+local LGB = Tabs.Main:AddLeftGroupbox("Attack", "crosshair")
+
+LGB:AddToggle("shootnigger", {
+	Text = "ragebot",
+	Default = false,
+	Callback = function(v)
+		shootnigger = v
+		if shootnigger then
+			cf()
+			if not al then
+				al = RunService.Heartbeat:Connect(function()
+					if not shootnigger then return end
+					at()
+					coe()
+					if ct and esp and hb[ct] then
+						uhd(ct)
+					end
+				end)
+			end
+		else
+			ct = nil
+			if esp then cle() end
+		end
+	end,
+})
+
+LGB:AddSlider("ac", {
+	Text = "ragebot speed",
+	Default = 0.1,
+	Min = 0.01,
+	Max = 1,
+	Rounding = 2,
+	Callback = function(v)
+		ac = v
+	end,
+})
+
+LGB:AddToggle("esp", {
+	Text = "ragebot target esp",
+	Default = false,
+	Callback = function(v)
+		esp = v
+		if not v then
+			cle()
+		end
+	end,
+})
+
+LGB:AddToggle("vis", {
+	Text = "ragebot visualization",
+	Default = false,
+	Callback = function(v)
+		vis = v
+	end,
+})
+
+LGB:AddToggle("snd", {
+	Text = "ragebot hitsound",
+	Default = false,
+	Callback = function(v)
+		snd = v
+	end,
+})
+
+Library:OnUnload(function()
+	shootnigger = false
+	if al then
+		al:Disconnect()
+		al = nil
+	end
+	cle()
+	if ef then ef:Destroy() end
+end)
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+ThemeManager:SetFolder("MyScriptHub")
+SaveManager:SetFolder("MyScriptHub/specific-game")
+SaveManager:BuildConfigSection(Tabs["UI Settings"])
+ThemeManager:ApplyToTab(Tabs["UI Settings"])
+SaveManager:LoadAutoloadConfig()
+--hallo skider :)
