@@ -360,7 +360,7 @@ local Window = Library:CreateWindow({
 
 -- Manual Right Shift toggle
 local uiVisible = true
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
+local rightShiftConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then return end
 	if input.KeyCode == Enum.KeyCode.RightShift then
 		uiVisible = not uiVisible
@@ -437,6 +437,223 @@ LGB:AddToggle("snd", {
 	end,
 })
 
+--==================================================
+-- BASES & OBJECTIVES (BUILT INTO THE SAME OBSIDIAN UI)
+-- This uses the existing Main tab; it creates no ScreenGui.
+--==================================================
+
+local ObjectiveGroup = Tabs.Main:AddGroupbox({
+	Side = "Right",
+	Name = "Bases & Objectives",
+	IconName = "target",
+})
+local objectiveElements = {}
+
+local function clearObjectiveElements()
+	for _, element in ipairs(objectiveElements) do
+		pcall(function()
+			element:Destroy()
+		end)
+	end
+	table.clear(objectiveElements)
+end
+
+local function isDoorPrompt(prompt)
+	local action = string.lower(prompt.ActionText or "")
+	local objectText = string.lower(prompt.ObjectText or "")
+
+	if action == "kick" or action == "open" then
+		return true
+	end
+
+	if string.find(objectText, "door", 1, true) then
+		return true
+	end
+
+	local current = prompt.Parent
+	while current and current ~= Workspace do
+		if string.find(string.lower(current.Name), "door", 1, true) then
+			return true
+		end
+		current = current.Parent
+	end
+
+	return false
+end
+
+local function getPromptTargetPart(prompt)
+	local current = prompt.Parent
+
+	while current and current ~= Workspace do
+		if current:IsA("BasePart") then
+			return current
+		end
+
+		if current:IsA("Model") then
+			local part = current.PrimaryPart
+				or current:FindFirstChildWhichIsA("BasePart", true)
+			if part then
+				return part
+			end
+		end
+
+		current = current.Parent
+	end
+
+	return nil
+end
+
+local function getObjectivePrompts(root)
+	local prompts = {}
+
+	if root:IsA("ProximityPrompt") and not isDoorPrompt(root) then
+		table.insert(prompts, root)
+	end
+
+	for _, descendant in ipairs(root:GetDescendants()) do
+		if descendant:IsA("ProximityPrompt") and not isDoorPrompt(descendant) then
+			table.insert(prompts, descendant)
+		end
+	end
+
+	table.sort(prompts, function(a, b)
+		return a:GetFullName() < b:GetFullName()
+	end)
+
+	return prompts
+end
+
+local function activateObjectivePrompt(prompt)
+	if not prompt or not prompt.Parent or not prompt.Enabled then
+		warn("[Night Tide] Objective prompt is unavailable or disabled.")
+		return
+	end
+
+	local targetPart = getPromptTargetPart(prompt)
+	if not targetPart then
+		warn("[Night Tide] No target part found for " .. prompt:GetFullName())
+		return
+	end
+
+	local character = lp.Character
+	local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+	if not rootPart then
+		warn("[Night Tide] Character is not loaded.")
+		return
+	end
+
+	rootPart.CFrame = targetPart.CFrame + Vector3.new(0, 2, 0)
+	task.wait(0.2)
+
+	if typeof(fireproximityprompt) ~= "function" then
+		warn("[Night Tide] fireproximityprompt is unavailable in this environment.")
+		return
+	end
+
+	local success, err = pcall(function()
+		fireproximityprompt(prompt)
+	end)
+
+	if not success then
+		warn("[Night Tide] Objective activation failed: " .. tostring(err))
+	end
+end
+
+local function addObjectiveElement(element)
+	table.insert(objectiveElements, element)
+	return element
+end
+
+local function refreshObjectives()
+	clearObjectiveElements()
+
+	local roots = {}
+	local basesFolder = Workspace:FindFirstChild("Bases")
+	local objectivesFolder = Workspace:FindFirstChild("Objectives")
+
+	if basesFolder then
+		for _, base in ipairs(basesFolder:GetChildren()) do
+			table.insert(roots, base)
+		end
+	end
+
+	if objectivesFolder then
+		table.insert(roots, objectivesFolder)
+	end
+
+	if #roots == 0 then
+		addObjectiveElement(ObjectiveGroup:AddLabel("No Bases or Objectives folder found"))
+		return
+	end
+
+	for _, root in ipairs(roots) do
+		addObjectiveElement(ObjectiveGroup:AddDivider(root.Name))
+
+		local prompts = getObjectivePrompts(root)
+		if #prompts == 0 then
+			addObjectiveElement(ObjectiveGroup:AddLabel("No objective prompts found"))
+		else
+			for _, prompt in ipairs(prompts) do
+				local displayName = prompt.ObjectText
+				if displayName == "" then
+					displayName = prompt.Name
+				end
+
+				local actionName = prompt.ActionText
+				local buttonText = displayName
+				if actionName ~= "" then
+					buttonText = buttonText .. " - " .. actionName
+				end
+
+				local objectiveButton
+				objectiveButton = ObjectiveGroup:AddButton({
+					Text = buttonText,
+					Func = function()
+						-- Remove only this button immediately.
+						if objectiveButton then
+							objectiveButton:Destroy()
+						end
+
+						for index, element in ipairs(objectiveElements) do
+							if element == objectiveButton then
+								table.remove(objectiveElements, index)
+								break
+							end
+						end
+
+						-- Teleport to and request activation of the selected prompt.
+						task.spawn(function()
+							activateObjectivePrompt(prompt)
+						end)
+					end,
+				})
+
+				addObjectiveElement(objectiveButton)
+			end
+		end
+	end
+end
+
+ObjectiveGroup:AddButton({
+	Text = "Refresh Bases & Objectives",
+	Func = refreshObjectives,
+})
+
+local ScriptSettingsGroup = Tabs["UI Settings"]:AddGroupbox({
+	Side = "Right",
+	Name = "Script",
+	IconName = "settings",
+})
+
+ScriptSettingsGroup:AddButton({
+	Text = "Unload Script",
+	Func = function()
+		Library:Unload()
+	end,
+})
+
+refreshObjectives()
+
 Library:OnUnload(function()
 	shootnigger = false
 	if al then
@@ -444,7 +661,14 @@ Library:OnUnload(function()
 		al = nil
 	end
 	cle()
-	if ef then ef:Destroy() end
+	if ef then
+		ef:Destroy()
+		ef = nil
+	end
+	if rightShiftConnection then
+		rightShiftConnection:Disconnect()
+		rightShiftConnection = nil
+	end
 end)
 
 ThemeManager:SetLibrary(Library)
