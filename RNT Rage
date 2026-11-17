@@ -1,3 +1,4 @@
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -57,8 +58,7 @@ end
 
 local function ia(npc)
 	if not npc or not npc.Parent then return false end
-	
-	-- Exclude evidence orbs
+
 	local name = string.lower(npc.Name)
 	if name:find("evidence") or name:find("evidenceorb") or name:find("evidence_orb") then
 		return false
@@ -66,7 +66,7 @@ local function ia(npc)
 	if npc:GetAttribute("IsEvidence") or npc:GetAttribute("IsDrop") or npc:GetAttribute("IsOrb") then
 		return false
 	end
-	
+
 	local h = npc:GetAttribute("Health")
 	if typeof(h) == "number" and h <= 0 then return false end
 	if npc:GetAttribute("State") == "Dead" then return false end
@@ -358,7 +358,6 @@ local Window = Library:CreateWindow({
 	ShowCustomCursor = true,
 })
 
--- Manual Right Shift toggle
 local uiVisible = true
 local rightShiftConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then return end
@@ -438,8 +437,49 @@ LGB:AddToggle("snd", {
 })
 
 --==================================================
--- BASES & OBJECTIVES (BUILT INTO THE SAME OBSIDIAN UI)
--- This uses the existing Main tab; it creates no ScreenGui.
+-- BASE TELEPORT BUTTONS
+--==================================================
+
+local bases = {
+	{"Grizzly Watchout", -1443, 192, -577},
+	{"Blibs Airport", -2512, 113, -553},
+	{"Saints Observatory", -1217, 290, -1809},
+	{"Woodbergs Facility", -2700, 424, -1250},
+	{"Wolfs Facility", 824, 197, -1845},
+	{"Farmhouse", 905, 54, 660},
+	{"People's Port", 2116, 82, 104},
+	{"Base Sandstorm", 2392, 102, 734},
+	{"The City", 2063, 36, 1709},
+	{"Las Hotels", 1243, 49, 1473},
+	{"Small Dorf", 92, 236, 1256},
+	{"Uptown", -49, 329, 1858},
+	{"Snowdorf", -1284, 205, 1521},
+	{"Frosthold Facility", -2539, 414, 2053},
+	{"Oil Rig", 2856, 169, 1683},
+}
+
+for _, baseInfo in ipairs(bases) do
+	local base = baseInfo
+
+	LGB:AddButton({
+		Text = "TP: " .. base[1],
+		Func = function()
+			local character = lp.Character
+			local root = character and character:FindFirstChild("HumanoidRootPart")
+
+			if root then
+				root.CFrame = CFrame.new(
+					base[2],
+					base[3],
+					base[4]
+				)
+			end
+		end,
+	})
+end
+
+--==================================================
+-- BASES & OBJECTIVES
 --==================================================
 
 local ObjectiveGroup = Tabs.Main:AddGroupbox({
@@ -447,6 +487,7 @@ local ObjectiveGroup = Tabs.Main:AddGroupbox({
 	Name = "Bases & Objectives",
 	IconName = "target",
 })
+
 local objectiveElements = {}
 
 local function clearObjectiveElements()
@@ -609,7 +650,6 @@ local function refreshObjectives()
 				objectiveButton = ObjectiveGroup:AddButton({
 					Text = buttonText,
 					Func = function()
-						-- Remove only this button immediately.
 						if objectiveButton then
 							objectiveButton:Destroy()
 						end
@@ -621,7 +661,6 @@ local function refreshObjectives()
 							end
 						end
 
-						-- Teleport to and request activation of the selected prompt.
 						task.spawn(function()
 							activateObjectivePrompt(prompt)
 						end)
